@@ -65,8 +65,8 @@ class Client(
         self._session = requests.Session()
         self._session.mount("http://", http_adapter)
         self._api_url = mlrun.mlconf.iguazio_api_url
-        self._wait_for_job_completion_retry_interval = 5
-        self._wait_for_project_terminal_state_retry_interval = 5
+        self._wait_for_job_completion_retry_interval = 1
+        self._wait_for_project_terminal_state_retry_interval = 1
 
     def try_get_grafana_service_url(self, session: str) -> typing.Optional[str]:
         """
