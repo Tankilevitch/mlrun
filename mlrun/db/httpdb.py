@@ -191,7 +191,8 @@ class HTTPRunDB(RunDBInterface):
                 }
                 kw["cookies"] = cookies
             else:
-                kw["headers"] = {"Authorization": "Bearer " + self.token}
+                if "Authorization" not in kw.setdefault("headers", {}):
+                    kw["headers"].update({"Authorization": "Bearer " + self.token})
 
         if not self.session:
             self.session = requests.Session()
