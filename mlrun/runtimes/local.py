@@ -41,7 +41,7 @@ from ..utils.clones import extract_source
 from .base import BaseRuntime
 from .kubejob import KubejobRuntime
 from .remotesparkjob import RemoteSparkRuntime
-from .utils import RunError, global_context, log_std, get_in
+from .utils import RunError, get_in, global_context, log_std
 
 
 class ParallelRunner:
@@ -93,14 +93,16 @@ class ParallelRunner:
 
         completed_iter = as_completed([])
         for task in tasks:
+            task_struct = task.to_dict()
+            project = get_in(task_struct, "metadata.project")
+            uid = get_in(task_struct, "metadata.uid")
+            iter = get_in(task_struct, "metadata.iteration", 0)
+            mlrun.get_run_db().store_run(
+                task_struct, uid=uid, project=project, iter=iter
+            )
             resp = client.submit(
                 remote_handler_wrapper, task.to_json(), handler, self.spec.workdir
             )
-            # tsk = task.to_dict()
-            # project = get_in(tsk, "metadata.project")
-            # uid = get_in(tsk, "metadata.uid")
-            # iter = get_in(tsk, "metadata.iteration", 0)
-            # mlrun.get_run_db().store_run(tsk,uid=uid, project=project,iter=iter)
             completed_iter.add(resp)
             queued_runs += 1
             if queued_runs >= parallel_runs:
