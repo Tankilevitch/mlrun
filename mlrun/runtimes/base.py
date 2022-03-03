@@ -509,9 +509,13 @@ class BaseRuntime(ModelObj):
             runner = self._run_many
             if hasattr(self, "_parallel_run_many") and task_generator.use_parallel():
                 runner = self._parallel_run_many
+            logger.info("running parallel")
             results = runner(task_generator, execution, runspec)
+            logger.info("results", results=results)
             results_to_iter(results, runspec, execution)
+            logger.info("results_to_iter", results=results)
             result = execution.to_dict()
+            logger.info("to_dict",result=result)
 
         else:
             # single run
@@ -534,6 +538,7 @@ class BaseRuntime(ModelObj):
         self, result: dict, runspec: RunObject, schedule=None, err=None
     ):
         # if the purpose was to schedule (and not to run) nothing to wrap
+        logger.info("wrapping", result=result, runspec=RunObject, schedule=schedule, err=err)
         if schedule:
             return
 
@@ -712,12 +717,14 @@ class BaseRuntime(ModelObj):
         self, resp: dict = None, task: RunObject = None, err=None
     ) -> dict:
         """update the task state in the DB"""
+        logger.info("tanki", resp=resp, err=err)
         was_none = False
         if resp is None and task:
             was_none = True
             resp = self._get_db_run(task)
 
             if not resp:
+                logger.info("storing run",iterations=task.metadata.iteration)
                 self.store_run(task)
                 return task.to_dict()
 
@@ -750,6 +757,7 @@ class BaseRuntime(ModelObj):
             project = get_in(resp, "metadata.project")
             uid = get_in(resp, "metadata.uid")
             iter = get_in(resp, "metadata.iteration", 0)
+            logger.info("updating run", iter=iter, resp=resp)
             self._get_db().update_run(updates, uid, project, iter=iter)
 
         return resp

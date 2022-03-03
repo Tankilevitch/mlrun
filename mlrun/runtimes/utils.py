@@ -144,6 +144,7 @@ def log_std(db, runobj, out, err="", skip=False, show=True, silent=False):
         if show:
             print(out, flush=True)
         if db and not skip:
+            logger.info("storing log", iteration=iteration, out=out.encode())
             uid = runobj.metadata.uid
             project = runobj.metadata.project or ""
             db.store_log(uid, project, out.encode(), append=True)
