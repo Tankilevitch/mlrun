@@ -758,7 +758,9 @@ class BaseRuntime(ModelObj):
             uid = get_in(resp, "metadata.uid")
             iter = get_in(resp, "metadata.iteration", 0)
             logger.info("tanki storing", resp=resp)
-            self.store_run(task)
+            # self.store_run(task)
+            logger.info("stortanki", task=task,uid=uid,project=project,iter=iter)
+            self._get_db().store_run(task, uid,project,iter=iter)
             logger.info("updating run", iter=iter, resp=resp)
             self._get_db().update_run(updates, uid, project, iter=iter)
 
