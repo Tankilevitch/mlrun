@@ -759,7 +759,7 @@ class BaseRuntime(ModelObj):
             iter = get_in(resp, "metadata.iteration", 0)
             try:
                 self._get_db_run(task)
-            except mlrun.errors.MLRunNotFoundError:
+            except mlrun.errors.MLRunHTTPError:
                 self.store_run(task)
             logger.info("updating run", iter=iter, resp=resp)
             self._get_db().update_run(updates, uid, project, iter=iter)
