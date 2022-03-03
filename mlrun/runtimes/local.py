@@ -74,6 +74,7 @@ class ParallelRunner:
             nonlocal num_errors
             resp, sout, serr = future.result()
             runobj = RunObject.from_dict(resp)
+            logger.warning(f"iteration: {runobj.metadata.iteration}, runobj={runobj.to_dict()}, response={resp}")
             try:
                 log_std(self._db_conn, runobj, sout, serr, skip=self.is_child)
                 resp = self._update_run_state(resp)
@@ -97,6 +98,8 @@ class ParallelRunner:
             resp = client.submit(
                 remote_handler_wrapper, task.to_json(), handler, self.spec.workdir
             )
+            logger.warning("response", resp=resp)
+            print("response", resp)
             completed_iter.add(resp)
             queued_runs += 1
             if queued_runs >= parallel_runs:

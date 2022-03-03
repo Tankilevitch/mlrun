@@ -480,7 +480,9 @@ class BaseRuntime(ModelObj):
             if hasattr(self, "_parallel_run_many") and task_generator.use_parallel():
                 runner = self._parallel_run_many
             results = runner(task_generator, execution, runspec)
+            print("got results", results)
             results_to_iter(results, runspec, execution)
+            print(f"results are = {results}")
             result = execution.to_dict()
 
         else:
@@ -503,6 +505,8 @@ class BaseRuntime(ModelObj):
     def _wrap_run_result(
         self, result: dict, runspec: RunObject, schedule=None, err=None
     ):
+        print("wrapping")
+        logger.warning("wrapping")
         # if the purpose was to schedule (and not to run) nothing to wrap
         if schedule:
             return
@@ -691,6 +695,7 @@ class BaseRuntime(ModelObj):
             resp = self._get_db_run(task)
 
             if not resp:
+                logger.warning(f"storing run {task.metadata.iteration}")
                 self.store_run(task)
                 return task.to_dict()
 
