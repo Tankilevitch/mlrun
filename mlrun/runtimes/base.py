@@ -757,10 +757,8 @@ class BaseRuntime(ModelObj):
             project = get_in(resp, "metadata.project")
             uid = get_in(resp, "metadata.uid")
             iter = get_in(resp, "metadata.iteration", 0)
-            try:
-                self._get_db_run(task)
-            except Exception:
-                self.store_run(task)
+            logger.info("tanki storing", resp=resp)
+            self.store_run(task)
             logger.info("updating run", iter=iter, resp=resp)
             self._get_db().update_run(updates, uid, project, iter=iter)
 
