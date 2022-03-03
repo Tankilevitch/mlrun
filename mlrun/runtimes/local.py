@@ -96,10 +96,11 @@ class ParallelRunner:
             resp = client.submit(
                 remote_handler_wrapper, task.to_json(), handler, self.spec.workdir
             )
-            project = get_in(resp, "metadata.project")
-            uid = get_in(resp, "metadata.uid")
-            iter = get_in(resp, "metadata.iteration", 0)
-            mlrun.get_run_db().store_run(task.to_dict(),uid=uid, project=project,itet=iter)
+            tsk = task.to_dict()
+            project = get_in(tsk, "metadata.project")
+            uid = get_in(tsk, "metadata.uid")
+            iter = get_in(tsk, "metadata.iteration", 0)
+            mlrun.get_run_db().store_run(tsk,uid=uid, project=project,itet=iter)
             completed_iter.add(resp)
             queued_runs += 1
             if queued_runs >= parallel_runs:
