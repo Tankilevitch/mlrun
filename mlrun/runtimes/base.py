@@ -509,13 +509,9 @@ class BaseRuntime(ModelObj):
             runner = self._run_many
             if hasattr(self, "_parallel_run_many") and task_generator.use_parallel():
                 runner = self._parallel_run_many
-            logger.info("running parallel")
             results = runner(task_generator, execution, runspec)
-            logger.info("results", results=results)
             results_to_iter(results, runspec, execution)
-            logger.info("results_to_iter", results=results)
             result = execution.to_dict()
-            logger.info("to_dict", result=result)
 
         else:
             # single run
