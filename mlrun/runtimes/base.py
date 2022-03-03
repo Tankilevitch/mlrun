@@ -691,6 +691,7 @@ class BaseRuntime(ModelObj):
             resp = self._get_db_run(task)
 
             if not resp:
+                logger.info("storing run", iteration=task.metadata.iteration)
                 self.store_run(task)
                 return task.to_dict()
 
@@ -724,7 +725,7 @@ class BaseRuntime(ModelObj):
             uid = get_in(resp, "metadata.uid")
             iter = get_in(resp, "metadata.iteration", 0)
             self._get_db().update_run(updates, uid, project, iter=iter)
-
+        logger.info(f"updated respnse for {task.metadata.iteration}",resp=resp)
         return resp
 
     def _force_handler(self, handler):

@@ -97,6 +97,7 @@ class ParallelRunner:
             resp = client.submit(
                 remote_handler_wrapper, task.to_json(), handler, self.spec.workdir
             )
+            logger.info("resp", resp=resp)
             completed_iter.add(resp)
             queued_runs += 1
             if queued_runs >= parallel_runs:
