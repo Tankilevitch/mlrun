@@ -1199,7 +1199,7 @@ class HTTPRunDB(RunDBInterface):
         if resp.content:
             print("decoding :", resp.content)
             text = resp.content.decode()
-        return text, last_log_timestamp
+        return text, last_log_timestamp, len(resp.content)
 
     def remote_start(self, func_url) -> schemas.BackgroundTask:
         """Execute a function remotely, Used for ``dask`` functions.
