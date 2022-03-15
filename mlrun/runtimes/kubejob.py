@@ -218,15 +218,14 @@ class KubejobRuntime(KubeResource):
                 time.sleep(2)
                 if show_on_failure:
                     text = ""
-                    len_text = 0
                     db.get_builder_status(self, 0, logs=False)
                     if self.status.state == "error":
                         # re-read the full log on failure
-                        text, _ , len_text = db.get_builder_status(self, offset, logs=logs)
+                        text, _ = db.get_builder_status(self, offset, logs=logs)
                 else:
-                    text, _, len_text = db.get_builder_status(self, offset, logs=logs)
+                    text, _ = db.get_builder_status(self, offset, logs=logs)
                 print_log(text)
-                offset += len_text
+                offset += len(text)
 
         print()
         return self.status.state
