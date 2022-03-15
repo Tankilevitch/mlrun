@@ -1197,7 +1197,6 @@ class HTTPRunDB(RunDBInterface):
 
         text = ""
         if resp.content:
-            print("decoding :", resp.content)
             text = resp.content.decode()
         return text, last_log_timestamp
 
