@@ -212,7 +212,8 @@ class KubejobRuntime(KubeResource):
                 print(text, end="")
 
         print_log(text)
-        offset += len(text)
+        offset += len(text.splitlines())
+
         if watch:
             while self.status.state in ["pending", "running"]:
                 time.sleep(2)
