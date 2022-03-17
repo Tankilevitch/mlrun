@@ -426,6 +426,7 @@ def build_status(
 
         if resp and logs:
             out = '\n'.join(resp.splitlines()[offset:]).encode()
+            logger.info(f"offset: {offset}", out=out)
 
     update_in(fn, "status.state", state)
     if state == mlrun.api.schemas.FunctionState.ready:
