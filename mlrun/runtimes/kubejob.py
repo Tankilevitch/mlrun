@@ -225,7 +225,7 @@ class KubejobRuntime(KubeResource):
                 else:
                     text, _ = db.get_builder_status(self, offset, logs=logs)
                 print_log(text)
-                offset += len(text)
+                offset += len(text.splitlines())
 
         print()
         return self.status.state
