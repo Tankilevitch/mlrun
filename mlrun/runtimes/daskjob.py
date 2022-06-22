@@ -260,7 +260,11 @@ class DaskCluster(KubejobRuntime):
             background_task = db.remote_start(self._function_uri())
             if watch:
                 now = datetime.datetime.utcnow()
-                timeout = now + datetime.timedelta(minutes=10)
+                timeout = now + datetime.timedelta(
+                    seconds=int(
+                        mlrun.mlconf.background_tasks.default_timeouts.runtimes.dask
+                    )
+                )
                 while now < timeout:
                     background_task = db.get_project_background_task(
                         background_task.metadata.project, background_task.metadata.name
@@ -287,6 +291,8 @@ class DaskCluster(KubejobRuntime):
                             return
                     time.sleep(5)
                     now = datetime.datetime.utcnow()
+            else:
+                return background_task
         else:
             self._cluster = deploy_function(self)
             self.save(versioned=False)
