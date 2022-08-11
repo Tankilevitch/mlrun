@@ -103,12 +103,14 @@ class AuthVerifier(metaclass=mlrun.utils.singleton.Singleton):
         action: mlrun.api.schemas.AuthorizationAction,
         auth_info: mlrun.api.schemas.AuthInfo,
         raise_on_forbidden: bool = True,
+        request_id: str = None
     ) -> bool:
         return self.query_permissions(
             self._generate_resource_string_from_project_name(project_name),
             action,
             auth_info,
             raise_on_forbidden,
+            request_id,
         )
 
     def query_global_resource_permissions(
@@ -147,12 +149,14 @@ class AuthVerifier(metaclass=mlrun.utils.singleton.Singleton):
         action: mlrun.api.schemas.AuthorizationAction,
         auth_info: mlrun.api.schemas.AuthInfo,
         raise_on_forbidden: bool = True,
+        request_id: str = None,
     ) -> bool:
         return self._auth_provider.query_permissions(
             resource,
             action,
             auth_info,
             raise_on_forbidden,
+            request_id
         )
 
     def filter_by_permissions(

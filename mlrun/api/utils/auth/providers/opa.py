@@ -59,6 +59,7 @@ class Provider(
         action: mlrun.api.schemas.AuthorizationAction,
         auth_info: mlrun.api.schemas.AuthInfo,
         raise_on_forbidden: bool = True,
+        request_id: str = None,
     ) -> bool:
         # store is not really a verb in our OPA manifest, we map it to 2 query permissions requests (create & update)
         if action == mlrun.api.schemas.AuthorizationAction.store:
@@ -81,13 +82,13 @@ class Provider(
             return True
         body = self._generate_permission_request_body(resource, action, auth_info)
         if self._log_level > 5:
-            logger.debug("Sending request to OPA", body=body)
+            logger.debug("Sending request to OPA", request_id=request_id, body=body)
         response = self._send_request_to_api(
             "POST", self._permission_query_path, json=body
         )
         response_body = response.json()
         if self._log_level > 5:
-            logger.debug("Received response from OPA", body=response_body)
+            logger.debug("Received response from OPA",request_id=request_id, body=response_body)
         allowed = response_body["result"]
         if not allowed and raise_on_forbidden:
             raise mlrun.errors.MLRunAccessDeniedError(

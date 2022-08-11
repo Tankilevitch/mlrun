@@ -168,10 +168,12 @@ def list_runs(
     db_session: Session = Depends(deps.get_db_session),
 ):
     if project != "*":
+        logger.debug("query project permissions", request_id=request.state.request_id)
         mlrun.api.utils.auth.verifier.AuthVerifier().query_project_permissions(
             project,
             mlrun.api.schemas.AuthorizationAction.read,
             auth_info,
+            request_id=request.state.request_id
         )
     logger.debug("listing runs", request_id=request.state.request_id)
     runs = mlrun.api.crud.Runs().list_runs(
