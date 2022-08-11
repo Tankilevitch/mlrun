@@ -235,9 +235,12 @@ class SQLDB(DBInterface):
         partition_sort_by: schemas.SortField = None,
         partition_order: schemas.OrderType = schemas.OrderType.desc,
         max_partitions: int = 0,
+        request_id: str = None,
     ):
         project = project or config.default_project
+        logger.debug("find runs", request_id=request_id)
         query = self._find_runs(session, uid, project, labels)
+        logger.debug("starting to filter runs", request_id=request_id)
         if name is not None:
             query = self._add_run_name_query(query, name)
         if states is not None:
@@ -275,10 +278,11 @@ class SQLDB(DBInterface):
                 partition_order,
                 max_partitions,
             )
-
+        logger.debug("creating run list", request_id=request_id)
         runs = RunList()
         for run in query:
             runs.append(run.struct)
+        logger.debug("finished creating run list", request_id=request_id)
 
         return runs
 

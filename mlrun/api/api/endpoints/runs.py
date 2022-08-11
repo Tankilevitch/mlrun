@@ -140,6 +140,7 @@ def delete_run(
 
 @router.get("/runs")
 def list_runs(
+    request: Request,
     project: str = None,
     name: str = None,
     uid: str = None,
@@ -172,6 +173,7 @@ def list_runs(
             mlrun.api.schemas.AuthorizationAction.read,
             auth_info,
         )
+    logger.debug("listing runs", request_id=request.state.request_id)
     runs = mlrun.api.crud.Runs().list_runs(
         db_session,
         name,
@@ -191,7 +193,9 @@ def list_runs(
         partition_sort_by,
         partition_order,
         max_partitions,
+        request.state.request_id,
     )
+    logger.debug("finished listing runs", request_id=request.state.request_id)
     filtered_runs = mlrun.api.utils.auth.verifier.AuthVerifier().filter_project_resources_by_permissions(
         mlrun.api.schemas.AuthorizationResourceTypes.run,
         runs,
@@ -200,6 +204,10 @@ def list_runs(
             run.get("metadata", {}).get("uid"),
         ),
         auth_info,
+    )
+    logger.debug(
+        "finished filtering project resource permissions",
+        request_id=request.state.request_id,
     )
     return {
         "runs": filtered_runs,

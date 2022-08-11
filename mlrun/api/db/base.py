@@ -83,6 +83,7 @@ class DBInterface(ABC):
         partition_sort_by: schemas.SortField = None,
         partition_order: schemas.OrderType = schemas.OrderType.desc,
         max_partitions: int = 0,
+        request_id: str = None,
     ):
         pass
 

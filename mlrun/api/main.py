@@ -120,6 +120,7 @@ async def log_request_response(request: fastapi.Request, call_next):
             request_id=request_id,
             uri=path_with_query_string,
         )
+    request.state.request_id = request_id
     try:
         response = await call_next(request)
     except Exception as exc:
