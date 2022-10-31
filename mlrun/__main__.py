@@ -30,36 +30,6 @@ import pandas as pd
 import yaml
 from tabulate import tabulate
 
-import mlrun
-
-from .builder import upload_tarball
-from .config import config as mlconf
-from .db import get_run_db
-from .k8s_utils import K8sHelper
-from .model import RunTemplate
-from .platforms import auto_mount as auto_mount_modifier
-from .projects import load_project
-from .run import (
-    get_object,
-    import_function,
-    import_function_to_dict,
-    load_func_code,
-    new_function,
-)
-from .runtimes import RemoteRuntime, RunError, RuntimeKinds, ServingRuntime
-from .secrets import SecretsStore
-from .utils import (
-    dict_to_yaml,
-    get_in,
-    is_relative_path,
-    list2dict,
-    logger,
-    parse_versioned_object_uri,
-    run_keys,
-    update_in,
-)
-from .utils.version import Version
-
 pd.set_option("mode.chained_assignment", None)
 
 
@@ -212,6 +182,8 @@ def run(
     ensure_project,
 ):
     """Execute a task and inject parameters."""
+    import mlrun
+    import mlrun.utils.version
 
     if env_file:
         mlrun.set_env_from_file(env_file)
@@ -220,20 +192,20 @@ def run(
     config = environ.get("MLRUN_EXEC_CONFIG")
     if from_env and config:
         config = json.loads(config)
-        runobj = RunTemplate.from_dict(config)
+        runobj = mlrun.model.RunTemplate.from_dict(config)
     elif task:
-        obj = get_object(task)
+        obj = mlrun.run.get_object(task)
         task = yaml.load(obj, Loader=yaml.FullLoader)
-        runobj = RunTemplate.from_dict(task)
+        runobj = mlrun.model.RunTemplate.from_dict(task)
     else:
-        runobj = RunTemplate()
+        runobj = mlrun.model.RunTemplate()
 
     set_item(runobj.metadata, uid, "uid")
     set_item(runobj.metadata, name, "name")
     set_item(runobj.metadata, project, "project")
 
     if label:
-        label_dict = list2dict(label)
+        label_dict = mlrun.utils.list2dict(label)
         for k, v in label_dict.items():
             runobj.metadata.labels[k] = v
 
@@ -242,7 +214,7 @@ def run(
         runobj.metadata.labels["mlrun/runner-pod"] = socket.gethostname()
 
     if db:
-        mlconf.dbpath = db
+        mlrun.mlconf.dbpath = db
 
     # remove potential quotes from command
     eval_url = py_eval(url)
@@ -263,7 +235,7 @@ def run(
     if func_url or kind or image:
         if func_url:
             runtime = func_url_to_runtime(func_url, ensure_project)
-            kind = get_in(runtime, "kind", kind or "job")
+            kind = mlrun.utils.get_in(runtime, "kind", kind or "job")
             if runtime is None:
                 exit(1)
         else:
@@ -275,10 +247,10 @@ def run(
                 with open(url_file) as fp:
                     body = fp.read()
                 based = b64encode(body.encode("utf-8")).decode("utf-8")
-                logger.info(f"packing code at {url_file}")
-                update_in(runtime, "spec.build.functionSourceCode", based)
+                mlrun.utils.logger.info(f"packing code at {url_file}")
+                mlrun.utils.update_in(runtime, "spec.build.functionSourceCode", based)
                 url = f"main{pathlib.Path(url_file).suffix} {url_args}"
-                update_in(runtime, "spec.build.code_origin", url_file)
+                mlrun.utils.update_in(runtime, "spec.build.code_origin", url_file)
     elif runtime:
         runtime = py_eval(runtime)
         if not isinstance(runtime, dict):
@@ -288,12 +260,12 @@ def run(
         runtime = {}
 
     code = environ.get("MLRUN_EXEC_CODE")
-    if get_in(runtime, "kind", "") == "dask":
-        code = get_in(runtime, "spec.build.functionSourceCode", code)
+    if mlrun.utils.get_in(runtime, "kind", "") == "dask":
+        code = mlrun.utils.get_in(runtime, "spec.build.functionSourceCode", code)
     if from_env and code:
         code = b64decode(code).decode("utf-8")
         origin_file = pathlib.Path(
-            get_in(runtime, "spec.build.origin_filename", origin_file)
+            mlrun.utils.get_in(runtime, "spec.build.origin_filename", origin_file)
         )
         if kfp:
             print(f"code:\n{code}\n")
@@ -328,12 +300,12 @@ def run(
         if not name and not runtime:
             name = path.splitext(path.basename(url))[0]
             runobj.metadata.name = runobj.metadata.name or name
-        update_in(runtime, "spec.command", url)
+        mlrun.utils.update_in(runtime, "spec.command", url)
 
     if run_args:
-        update_in(runtime, "spec.args", list(run_args))
+        mlrun.utils.update_in(runtime, "spec.args", list(run_args))
     if image:
-        update_in(runtime, "spec.image", image)
+        mlrun.utils.update_in(runtime, "spec.image", image)
     set_item(runobj.spec, handler, "handler")
     set_item(runobj.spec, param, "parameters", fill_params(param))
 
@@ -344,41 +316,46 @@ def run(
     set_item(runobj.spec.hyper_param_options, hyper_param_strategy, "strategy")
     set_item(runobj.spec.hyper_param_options, selector, "selector")
 
-    set_item(runobj.spec, inputs, run_keys.inputs, list2dict(inputs))
-    set_item(runobj.spec, in_path, run_keys.input_path)
-    set_item(runobj.spec, out_path, run_keys.output_path)
-    set_item(runobj.spec, outputs, run_keys.outputs, list(outputs))
     set_item(
-        runobj.spec, secrets, run_keys.secrets, line2keylist(secrets, "kind", "source")
+        runobj.spec, inputs, mlrun.utils.run_keys.inputs, mlrun.utils.list2dict(inputs)
+    )
+    set_item(runobj.spec, in_path, mlrun.utils.run_keys.input_path)
+    set_item(runobj.spec, out_path, mlrun.utils.run_keys.output_path)
+    set_item(runobj.spec, outputs, mlrun.utils.run_keys.outputs, list(outputs))
+    set_item(
+        runobj.spec,
+        secrets,
+        mlrun.utils.run_keys.secrets,
+        line2keylist(secrets, "kind", "source"),
     )
     set_item(runobj.spec, verbose, "verbose")
     set_item(runobj.spec, scrape_metrics, "scrape_metrics")
-    update_in(runtime, "metadata.name", name, replace=False)
-    update_in(runtime, "metadata.project", project, replace=False)
+    mlrun.utils.update_in(runtime, "metadata.name", name, replace=False)
+    mlrun.utils.update_in(runtime, "metadata.project", project, replace=False)
     if not kind and "." in handler:
         # handle the case of module.submodule.handler
-        update_in(runtime, "kind", "local")
+        mlrun.utils.update_in(runtime, "kind", "local")
 
     if kfp or runobj.spec.verbose or verbose:
-        print(f"MLRun version: {str(Version().get())}")
+        print(f"MLRun version: {str(mlrun.utils.version.Version().get())}")
         print("Runtime:")
         pprint(runtime)
         print("Run:")
         pprint(runobj.to_dict())
 
     try:
-        fn = new_function(runtime=runtime, kfp=kfp, mode=mode, source=source)
+        fn = mlrun.run.new_function(runtime=runtime, kfp=kfp, mode=mode, source=source)
         if workdir:
             fn.spec.workdir = workdir
         if auto_mount:
-            fn.apply(auto_mount_modifier())
+            fn.apply(mlrun.platforms.auto_mount())
         fn.is_child = from_env and not kfp
         resp = fn.run(
             runobj, watch=watch, schedule=schedule, local=local, auto_build=auto_build
         )
         if resp and dump:
             print(resp.to_yaml())
-    except RunError as err:
+    except mlrun.runtimes.RunError as err:
         print(f"runtime error: {err}")
         exit(1)
 
@@ -441,12 +418,13 @@ def build(
     ensure_project,
 ):
     """Build a container image from code and requirements."""
+    import mlrun
 
     if env_file:
         mlrun.set_env_from_file(env_file)
 
     if db:
-        mlconf.dbpath = db
+        mlrun.mlconf.dbpath = db
 
     if runtime:
         runtime = py_eval(runtime)
@@ -456,19 +434,19 @@ def build(
         if kfp:
             print("Runtime:")
             pprint(runtime)
-        func = new_function(runtime=runtime)
+        func = mlrun.new_function(runtime=runtime)
     elif func_url.startswith("db://"):
         func_url = func_url[5:]
-        func = import_function(func_url)
+        func = mlrun.import_function(func_url)
     elif func_url:
         func_url = "function.yaml" if func_url == "." else func_url
-        func = import_function(func_url)
+        func = mlrun.import_function(func_url)
     else:
         print("please specify the function path or url")
         exit(1)
 
     meta = func.metadata
-    meta.project = project or meta.project or mlconf.default_project
+    meta.project = project or meta.project or mlrun.mlconf.default_project
     meta.name = name or meta.name
     meta.tag = tag or meta.tag
 
@@ -486,20 +464,20 @@ def build(
         with open(source) as fp:
             body = fp.read()
         based = b64encode(body.encode("utf-8")).decode("utf-8")
-        logger.info(f"packing code at {source}")
+        mlrun.utils.logger.info(f"packing code at {source}")
         b.functionSourceCode = based
         func.spec.command = ""
     else:
         b.source = source or b.source
         # todo: upload stuff
 
-    archive = archive or mlconf.default_archive
+    archive = archive or mlrun.mlconf.default_archive
     if archive:
         src = b.source or "./"
-        logger.info(f"uploading data from {src} to {archive}")
+        mlrun.utils.logger.info(f"uploading data from {src} to {archive}")
         target = archive if archive.endswith("/") else archive + "/"
         target += f"src-{meta.project}-{meta.name}-{meta.tag or 'latest'}.tar.gz"
-        upload_tarball(src, target)
+        mlrun.builder.upload_tarball(src, target)
         # todo: replace function.yaml inside the tar
         b.source = target
 
@@ -512,7 +490,7 @@ def build(
         )
 
     if hasattr(func, "deploy"):
-        logger.info("remote deployment started")
+        mlrun.utils.logger.info("remote deployment started")
         try:
             func.deploy(
                 with_mlrun=with_mlrun, watch=not silent, is_kfp=kfp, skip_deployed=skip
@@ -578,6 +556,8 @@ def deploy(
     ensure_project,
 ):
     """Deploy model or function"""
+    import mlrun
+
     if env_file:
         mlrun.set_env_from_file(env_file)
 
@@ -604,27 +584,27 @@ def deploy(
         pprint(model)
 
     # support both v1 & v2+ model struct for backwards compatibility
-    if runtime and runtime["kind"] == RuntimeKinds.serving:
+    if runtime and runtime["kind"] == mlrun.runtimes.RuntimeKinds.serving:
         print("Deploying V2 model server")
-        function = ServingRuntime.from_dict(runtime)
+        function = mlrun.runtimes.ServingRuntime.from_dict(runtime)
         if model:
             # v2+ model struct (list of json obj)
             for _model in model:
                 args = json.loads(_model)
                 function.add_model(**args)
     else:
-        function = RemoteRuntime.from_dict(runtime)
+        function = mlrun.runtimes.RemoteRuntime.from_dict(runtime)
         if kind:
             function.spec.function_kind = kind
         if model:
             # v1 model struct (list of k=v)
-            models = list2dict(model)
+            models = mlrun.utils.list2dict(model)
             for k, v in models.items():
                 function.add_model(k, v)
 
     function.spec.source = source
     if env:
-        for k, v in list2dict(env).items():
+        for k, v in mlrun.utils.list2dict(env).items():
             function.set_env(k, v)
     function.verbose = verbose
 
@@ -649,7 +629,9 @@ def deploy(
 )
 def watch(pod, namespace, timeout):
     """Read current or previous task (pod) logs."""
-    k8s = K8sHelper(namespace)
+    import mlrun.k8s_utils
+
+    k8s = mlrun.k8s_utils.K8sHelper(namespace)
     status = k8s.watch(pod, namespace, timeout)
     print(f"Pod {pod} last status is: {status}")
 
@@ -666,12 +648,15 @@ def watch(pod, namespace, timeout):
 @click.argument("extra_args", nargs=-1, type=click.UNPROCESSED)
 def get(kind, name, selector, namespace, uid, project, tag, db, extra_args):
     """List/get one or more object per kind/class."""
+    import mlrun.db
+    import mlrun.k8s_utils
+    import mlrun.utils
 
     if db:
-        mlconf.dbpath = db
+        mlrun.mlconf.dbpath = db
 
     if kind.startswith("po"):
-        k8s = K8sHelper(namespace)
+        k8s = mlrun.k8s_utils.K8sHelper(namespace)
         if name:
             resp = k8s.get_pod(name, namespace)
             print(resp)
@@ -689,19 +674,19 @@ def get(kind, name, selector, namespace, uid, project, tag, db, extra_args):
                     start = i.status.start_time.strftime("%b %d %H:%M:%S")
                 print(f"{state:10} {start:16} {task:8} {name}")
     elif kind.startswith("runtime"):
-        run_db = get_run_db(db or mlconf.dbpath)
+        run_db = mlrun.db.get_run_db(db or mlrun.mlconf.dbpath)
         if name:
             # the runtime identifier is its kind
             runtime = run_db.list_runtime_resources(kind=name, label_selector=selector)
-            print(dict_to_yaml(runtime.dict()))
+            print(mlrun.utils.dict_to_yaml(runtime.dict()))
             return
         runtimes = run_db.list_runtime_resources(label_selector=selector)
-        print(dict_to_yaml(runtimes.dict()))
+        print(mlrun.utils.dict_to_yaml(runtimes.dict()))
     elif kind.startswith("run"):
-        run_db = get_run_db()
+        run_db = mlrun.db.get_run_db()
         if name:
             run = run_db.read_run(name, project=project)
-            print(dict_to_yaml(run))
+            print(mlrun.utils.dict_to_yaml(run))
             return
 
         runs = run_db.list_runs(uid=uid, project=project, labels=selector)
@@ -715,7 +700,7 @@ def get(kind, name, selector, namespace, uid, project, tag, db, extra_args):
         print(tabulate(df, headers="keys"))
 
     elif kind.startswith("art"):
-        run_db = get_run_db()
+        run_db = mlrun.db.get_run_db()
         artifacts = run_db.list_artifacts(
             name, project=project, tag=tag, labels=selector
         )
@@ -727,23 +712,23 @@ def get(kind, name, selector, namespace, uid, project, tag, db, extra_args):
         print(tabulate(df, headers="keys"))
 
     elif kind.startswith("func"):
-        run_db = get_run_db()
+        run_db = mlrun.db.get_run_db()
         if name:
             f = run_db.get_function(name, project=project, tag=tag)
-            print(dict_to_yaml(f))
+            print(mlrun.utils.dict_to_yaml(f))
             return
 
         functions = run_db.list_functions(name, project=project, labels=selector)
         lines = []
         headers = ["kind", "state", "name:tag", "hash"]
         for f in functions:
-            name = get_in(f, "metadata.name")
-            tag = get_in(f, "metadata.tag", "")
+            name = mlrun.utils.get_in(f, "metadata.name")
+            tag = mlrun.utils.get_in(f, "metadata.tag", "")
             line = [
-                get_in(f, "kind", ""),
-                get_in(f, "status.state", ""),
+                mlrun.utils.get_in(f, "kind", ""),
+                mlrun.utils.get_in(f, "status.state", ""),
                 f"{name}:{tag}",
-                get_in(f, "metadata.hash", ""),
+                mlrun.utils.get_in(f, "metadata.hash", ""),
             ]
             lines.append(line)
         print(tabulate(lines, headers=headers))
@@ -780,7 +765,7 @@ def db(port, dirpath, dsn, logs_path, data_volume, verbose, background):
         env["MLRUN_LOG_LEVEL"] = "DEBUG"
 
     # create the DB dir if needed
-    dsn = dsn or mlconf.httpdb.dsn
+    dsn = dsn or mlrun.mlconf.httpdb.dsn
     if dsn and dsn.startswith("sqlite:///"):
         parsed = urlparse(dsn)
         p = pathlib.Path(parsed.path[1:]).parent
@@ -808,6 +793,8 @@ def db(port, dirpath, dsn, logs_path, data_volume, verbose, background):
 
 @main.command()
 def version():
+    from .utils.version import Version
+
     """get mlrun version"""
     print(f"MLRun version: {str(Version().get())}")
 
@@ -819,8 +806,10 @@ def version():
 @click.option("--db", help="api and db service path/url")
 @click.option("--watch", "-w", is_flag=True, help="watch/follow log")
 def logs(uid, project, offset, db, watch):
+    import mlrun.db
+
     """Get or watch task logs"""
-    mldb = get_run_db(db or mlconf.dbpath)
+    mldb = mlrun.db.get_run_db(db or mlrun.mlconf.dbpath)
     if mldb.kind == "http":
         state = mldb.watch_log(uid, project, watch=watch, offset=offset)
     else:
@@ -928,19 +917,22 @@ def project(
     schedule,
 ):
     """load and/or run a project"""
+    import mlrun
+    import mlrun.secrets
+
     if env_file:
         mlrun.set_env_from_file(env_file)
 
     if db:
-        mlconf.dbpath = db
+        mlrun.mlconf.dbpath = db
 
-    proj = load_project(
+    proj = mlrun.projects.load_project(
         context, url, name, init_git=init_git, clone=clone, save=ensure_project
     )
     url_str = " from " + url if url else ""
     print(f"Loading project {proj.name}{url_str} into {context}:\n")
 
-    if is_relative_path(artifact_path):
+    if mlrun.utils.is_relative_path(artifact_path):
         artifact_path = path.abspath(artifact_path)
     if param:
         proj.spec.params = fill_params(param, proj.spec.params)
@@ -957,7 +949,7 @@ def project(
         proj.spec.params["commit_id"] = commit
     if secrets:
         secrets = line2keylist(secrets, "kind", "source")
-        proj._secrets = SecretsStore.from_list(secrets)
+        proj._secrets = mlrun.secrets.SecretsStore.from_list(secrets)
     print(proj.to_yaml())
 
     if run:
@@ -1021,7 +1013,9 @@ def project(
 
 
 def validate_kind(ctx, param, value):
-    possible_kinds = RuntimeKinds.runtime_with_handlers()
+    import mlrun
+
+    possible_kinds = mlrun.runtimes.RuntimeKinds.runtime_with_handlers()
     if value is not None and value not in possible_kinds:
         raise click.BadParameter(
             f"kind must be one of {possible_kinds}", ctx=ctx, param=param
@@ -1042,7 +1036,7 @@ def validate_kind(ctx, param, value):
     "-gp",
     type=int,
     # When someone triggers the cleanup manually we assume they want runtime resources in terminal state to be removed
-    # now, therefore not using here mlconf.runtime_resources_deletion_grace_period
+    # now, therefore not using here mlrun.mlconf.runtime_resources_deletion_grace_period
     default=0,
     help="the grace period (in seconds) that will be given to runtime resources (after they're in terminal state) "
     "before cleaning them. Ignored when --force is given",
@@ -1067,7 +1061,9 @@ def clean(kind, object_id, api, label_selector, force, grace_period):
         # Clean resources for specific job (by uid)
         mlrun clean mpijob 15d04c19c2194c0a8efb26ea3017254b
     """
-    mldb = get_run_db(api or mlconf.dbpath)
+    import mlrun
+
+    mldb = mlrun.get_run_db(api or mlrun.mlconf.dbpath)
     mldb.delete_runtime_resources(
         kind=kind,
         object_id=object_id,
@@ -1103,6 +1099,8 @@ def clean(kind, object_id, api, label_selector, force, grace_period):
 )
 def watch_stream(url, shard_ids, seek, interval, is_json):
     """watch on a stream and print data every interval"""
+    import mlrun
+
     mlrun.platforms.watch_stream(
         url, shard_ids, seek, interval=interval, is_json=is_json
     )
@@ -1111,7 +1109,7 @@ def watch_stream(url, shard_ids, seek, interval, is_json):
 @main.command(name="config")
 def show_config():
     """Show configuration & exit"""
-    print(mlconf.dump_yaml())
+    print(mlrun.mlconf.dump_yaml())
 
 
 def fill_params(params, params_dict=None):
@@ -1171,28 +1169,35 @@ def dict_to_str(struct: dict):
 
 
 def func_url_to_runtime(func_url, ensure_project: bool = False):
+    import mlrun
+
     try:
         if func_url.startswith("db://"):
             func_url = func_url[5:]
-            project_instance, name, tag, hash_key = parse_versioned_object_uri(func_url)
-            run_db = get_run_db(mlconf.dbpath)
+            (
+                project_instance,
+                name,
+                tag,
+                hash_key,
+            ) = mlrun.utils.parse_versioned_object_uri(func_url)
+            run_db = mlrun.get_run_db(mlrun.mlconf.dbpath)
             runtime = run_db.get_function(name, project_instance, tag, hash_key)
         elif func_url == "." or func_url.endswith(".yaml"):
             func_url = "function.yaml" if func_url == "." else func_url
-            runtime = import_function_to_dict(func_url, {})
+            runtime = mlrun.run.import_function_to_dict(func_url, {})
         else:
-            mlrun_project = load_project(".", save=ensure_project)
+            mlrun_project = mlrun.load_project(".", save=ensure_project)
             function = mlrun_project.get_function(func_url, enrich=True)
             if function.kind == "local":
-                command, function = load_func_code(function)
+                command, function = mlrun.run.load_func_code(function)
                 function.spec.command = command
             runtime = function.to_dict()
     except Exception as exc:
-        logger.error(f"function {func_url} not found, {exc}")
+        mlrun.utils.logger.error(f"function {func_url} not found, {exc}")
         return None
 
     if not runtime:
-        logger.error(f"function {func_url} not found or is null")
+        mlrun.utils.logger.error(f"function {func_url} not found or is null")
         return None
 
     return runtime
