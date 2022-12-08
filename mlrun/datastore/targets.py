@@ -767,7 +767,6 @@ class ParquetTarget(BaseStoreTarget):
         df.to_parquet(
             target_path,
             partition_cols=partition_cols,
-            storage_options=fs.get_storage_options(),
             **kwargs,
         )
 
