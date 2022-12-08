@@ -763,7 +763,12 @@ class ParquetTarget(BaseStoreTarget):
     def _write_dataframe(df, fs, target_path, partition_cols, **kwargs):
         # In order to save the DataFrame in parquet format, all of the column names must be strings:
         df.columns = [str(column) for column in df.columns.tolist()]
-        df.to_parquet(target_path, partition_cols=partition_cols, **kwargs)
+        df.to_parquet(
+            target_path,
+            partition_cols=partition_cols,
+            storage_options=fs.get_storage_options(),
+            **kwargs,
+        )
 
     def add_writer_state(
         self, graph, after, features, key_columns=None, timestamp_key=None
