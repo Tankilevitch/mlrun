@@ -466,13 +466,13 @@ class BaseStoreTarget(DataTargetBase):
         chunk_id=0,
         **kwargs,
     ) -> typing.Optional[int]:
+        storage_options = self._get_store().get_storage_options()
         if hasattr(df, "rdd"):
             options = self.get_spark_options(key_column, timestamp_key)
             options.update(kwargs)
             df.write.mode("overwrite").save(**options)
         elif hasattr(df, "dask"):
             dask_options = self.get_dask_options()
-            storage_options = self._get_store().get_storage_options()
             df = df.repartition(partition_size="100MB")
             try:
                 if dask_options["format"] == "parquet":
@@ -524,6 +524,7 @@ class BaseStoreTarget(DataTargetBase):
                     )
                     if unit == time_partitioning_granularity:
                         break
+            kwargs.update({"storage_options": storage_options})
             self._write_dataframe(
                 target_df, fs, target_path, partition_cols=partition_cols, **kwargs
             )
