@@ -21,7 +21,8 @@ from typing import Optional, Union
 import mlrun
 import mlrun.model
 import mlrun.model_monitoring.constants as model_monitoring_constants
-import mlrun.platforms.iguazio
+
+# import mlrun.platforms.iguazio
 import mlrun.utils
 from mlrun.api.schemas.schedule import ScheduleCronTrigger
 
